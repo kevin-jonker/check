@@ -1,0 +1,7 @@
+--only-binary=:all:
+streamlit
+pandas
+plotly
+spacy>=3.8.0
+https://github.com/explosion/spacy-models/releases/download/de_core_news_sm-3.8.0/de_core_news_sm-3.8.0-py3-none-any.whl
+kaleido==0.2.1

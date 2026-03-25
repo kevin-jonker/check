@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import re
 import spacy
 from collections import Counter
@@ -42,10 +41,8 @@ st.subheader("Data Science & Narrative DNA")
 class LoreProcessor:
     @staticmethod
     def split_into_chapters(text):
-        # Erkennt Kapitel, Teil, Section oder römische Ziffern
         pattern = r'\n\s*(?:Kapitel|Chapter|Teil|Buch|SECTION|ACT)\s+[0-9IVXLCDM]+\b|(?:\n\s*[IVXLCDM]+\.\s+\b)'
         chapters = re.split(pattern, text, flags=re.IGNORECASE)
-        # Filtert nur sehr kurze Artefakte unter 150 Zeichen aus
         return [c.strip() for c in chapters if len(c.strip()) > 150]
 
     @staticmethod
@@ -57,29 +54,24 @@ class LoreProcessor:
         unique_words = set(words_raw)
         types_count = len(unique_words)
         
-        # Sentiment
         pos_words = ["liebe", "herz", "freude", "licht", "glück", "lachen", "triumph", "strahlend", "hoffnung", "mut"]
         neg_words = ["tod", "schmerz", "angst", "nacht", "weinen", "elend", "verlust", "grab", "einsam", "zorn"]
         sent_score = sum(1 for w in words_raw if w in pos_words) - sum(1 for w in words_raw if w in neg_words)
         normalized_sentiment = (sent_score / tokens_count * 1000)
 
-        # Herdan's C
         herdan_c = np.log(types_count) / np.log(tokens_count) if tokens_count > 1 else 0
 
-        # Satz-Analyse
         sentences = re.split(r'[.!?]+', text)
         sentences = [s.strip() for s in sentences if len(s.strip()) > 2]
         sentence_lengths = [len(s.split()) for s in sentences]
         avg_sentence_len = np.mean(sentence_lengths) if sentence_lengths else 0
         sentence_volatility = np.std(sentence_lengths) if sentence_lengths else 0
         
-        # Hapax & Sternen-Daten
         word_counts = Counter(words_raw)
         hapax_count = sum(1 for word in word_counts if word_counts[word] == 1)
         first_sentence = sentences[0] if sentences else ""
         star_data = [len(w) for w in first_sentence.split()]
 
-        # Charakter-Präsenz
         char_presence = {}
         for final_name, alias_list in final_characters.items():
             count = 0
@@ -107,29 +99,21 @@ with st.sidebar:
         
         if mode == "Kapitel-Erkennung":
             all_raw_chapters = LoreProcessor.split_into_chapters(raw_text)
-            
-            # 🔍 KAPITEL-FILTER (Neu!)
             st.write("### ✂️ Kapitel-Filter")
-            st.info("Wähle Kapitel ab, die z.B. nur Copyright oder Datenschutz enthalten.")
-            
             selected_indices = []
             for i, c in enumerate(all_raw_chapters):
                 snippet = c[:40].replace('\n', ' ')
-                # Automatische Vorauswahl: Markiere Kapitel mit "Gutenberg" oder "Copyright" als abgewählt
                 is_junk = any(x in c.lower()[:500] for x in ["copyright", "gutenberg", "license", "trademarks"])
                 if st.checkbox(f"[{i+1}] {snippet}...", value=not is_junk, key=f"ch_{i}"):
                     selected_indices.append(i)
-            
             chunks = [all_raw_chapters[i] for i in selected_indices]
             labels = [f"Kap. {i+1}" for i in selected_indices]
-        
         else:
             block_size = st.slider("Wörter pro Block:", 500, 10000, 2000, step=500)
             all_words = raw_text.split()
             chunks = [" ".join(all_words[i : i + block_size]) for i in range(0, len(all_words), block_size)]
             labels = [f"Block {i+1}" for i in range(len(chunks))]
 
-        # CHARAKTER-BÜNDELUNG
         st.header("👥 Charakter-Management")
         if nlp:
             with st.spinner("Extrahiere Figuren..."):
@@ -179,53 +163,42 @@ if uploaded_file and 'chunks' in locals():
     progress_bar.empty()
     
     df = pd.DataFrame(results)
-
     tab1, tab2, tab3 = st.tabs(["📊 Narrative Dynamik", "👥 Beziehungs-Netz", "✨ Sternenbild-Poster"])
 
     with tab1:
-        # Sentiment
         st.write("#### 📊 Emotionaler Bogen")
         fig_sent = px.line(df, x="Abschnitt", y="Sentiment", template="plotly_dark", color_discrete_sequence=[theme_color])
-        fig_sent.update_layout(yaxis=dict(title="Score (Normiert)", zeroline=True, zerolinecolor='white'), width='stretch')
-        st.plotly_chart(fig_sent, width='stretch')
+        fig_sent.update_layout(yaxis=dict(title="Score (Normiert)", zeroline=True, zerolinecolor='white'))
+        st.plotly_chart(fig_sent, use_container_width=True)
         
-        with st.popover("ⓘ Info zum Sentiment"):
-            st.write("**Skala:** 🟢 > 0 Positiv | 🔴 < 0 Negativ")
-
         st.divider()
-
-        # Dichte (Fix: Raw String für LaTeX)
         st.write("#### 🧠 Lexikalische Dichte (Herdan's C)")
         fig_dens = px.line(df, x="Abschnitt", y="Dichte_C", template="plotly_dark", color_discrete_sequence=["#C0C0C0"])
-        st.plotly_chart(fig_dens, width='stretch')
+        st.plotly_chart(fig_dens, use_container_width=True)
         with st.popover("ⓘ Info zur Dichte"):
             st.write(r"**Methode:** $C = \frac{\log(Unique)}{\log(Total)}$")
 
         st.divider()
-
-        # Satzlängen (Fix: color statt marker_color)
         st.write("#### ⏱️ Satzlängen-Rhythmus (Puls)")
         fig_len = px.bar(df, x="Abschnitt", y="Satzlänge", template="plotly_dark", color_discrete_sequence=["#444444"])
-        st.plotly_chart(fig_len, width='stretch')
+        st.plotly_chart(fig_len, use_container_width=True)
 
         st.divider()
-
-        # Hapax
         st.write("#### ✨ Vokabular-Reichtum")
         fig_hapax = px.line(df, x="Abschnitt", y="Hapax", template="plotly_dark", color_discrete_sequence=["#888888"])
-        st.plotly_chart(fig_hapax, width='stretch')
+        st.plotly_chart(fig_hapax, use_container_width=True)
 
     with tab2:
         if selected_final_chars:
             st.write("#### 👤 Präsenz der Figuren")
             fig_chars = px.line(df, x="Abschnitt", y=selected_final_chars, template="plotly_dark")
-            st.plotly_chart(fig_chars, width='stretch')
+            st.plotly_chart(fig_chars, use_container_width=True)
             
             st.divider()
             st.write("#### 🤝 Interaktions-Matrix")
             corr = df[selected_final_chars].corr()
             fig_heat = px.imshow(corr, text_auto=True, color_continuous_scale="Viridis")
-            st.plotly_chart(fig_heat, width='stretch')
+            st.plotly_chart(fig_heat, use_container_width=True)
 
     with tab3:
         st.write("### 🌌 Nicolas Rougeaux Edition")
@@ -239,13 +212,11 @@ if uploaded_file and 'chunks' in locals():
                     theta = np.linspace(0, 360, len(data), endpoint=False)
                     fig_stars.add_trace(go.Scatterpolar(r=data, theta=theta, mode='markers+lines', name=df['Abschnitt'].iloc[i], marker=dict(color=colors[i])))
         else:
-            theta_chunks = np.linspace(0, 360, len(star_maps), endpoint=False)
             for i, data in enumerate(star_maps):
                 if data:
                     fig_stars.add_trace(go.Scatterpolar(r=np.add(data, 10), theta=np.linspace(0, 360, len(data), endpoint=False), mode='markers+lines', marker=dict(color=theme_color)))
 
-        fig_stars.update_layout(height=800, template="plotly_dark", width='stretch')
-        st.plotly_chart(fig_stars, width='stretch')
-
+        fig_stars.update_layout(height=800, template="plotly_dark")
+        st.plotly_chart(fig_stars, use_container_width=True)
 else:
     st.info("Bitte lade eine .txt Datei hoch.")
